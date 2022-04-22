@@ -1,37 +1,48 @@
-var express = require('express');
-var app = express();
-var server = require('http').Server(app);
-var io = require('socket.io')(server);
-var players = {};
+const express = require('express');
+const http = require('http');
+const path = require('path');
+const socketIO = require('socket.io');
 
-app.use(express.static(__dirname + '/public'));
+const app = express();
+var server = http.Server(app);
+var io = socketIO(server, {
+  pingTimeout: 60000,
+  
+})
 
-app.get('/', function (req, res){
-    res.sendFile(__dirname + '/index.html');
-});
+app.set('port', 3000)
+app.use('/public', express.static(__dirname + '/public'))
+
+app.get('/', function (request, response) {
+  response.sendFile(path.join(__dirname, 'index.html'))
+})
+
+server.listen(3000, function () {
+  console.log('Starting server...')
+})
+
+var players = {}
+var gameState = "Initialzing";
+
+console.log('here')
 
 io.on('connection', function (socket){
-    console.log('a user has connected');
+  console.log('player [' + socket.id + '] connected')
+
+  if(Object.keys(players).length < 2){
     players[socket.id] = {
-        playerId: socket.id,
-        team: (Math.floor(Math.random() * 2) ? 'red' : 'blue' )
-    };
+      Deck: [],
+      playerID: socket.id
+    }
+  }
 
-    // // send the players object to the new player
-    // socket.emit('currentPlayers', players);
-    // // update all other players of the new player
-    // socket.broadcast.emit('newPlayer', players[socket.id]);
+ socket.emit('currentPlayers', players)
+ socket.broadcast.emit('newPlayer', players[socket.id])
 
-    socket.on('disconnect', function(){
-        // // remove this player from our players object
-        // delete players[socket.id];
-        // // emit a message to all players to remove this player
-        // io.emit('disconnect', socket.id);
-        console.log('user has disconnected');
-    });
-});
+ socket.on('disconnect', function () {
+   console.log('player [' + socket.id + '] disconnected')
+   delete players[socket.id]
+   io.emit('playerDisconnected', socket.id)
+ })
 
-server.listen(8082, function(){
-    console.log(`Listening on ${server.address().port}`);
-});
-
+})
